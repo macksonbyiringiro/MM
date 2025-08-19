@@ -1,17 +1,15 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import type { StudyGuideContent, QuizQuestion } from '../types';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const model = "gemini-2.5-flash";
 
 const studyGuideSchema = {
     type: Type.OBJECT,
     properties: {
+        summary: {
+            type: Type.STRING,
+            description: "A detailed but easy-to-understand summary of the entire topic, at least 3-4 sentences long."
+        },
         keyConcepts: {
             type: Type.ARRAY,
             items: { type: Type.STRING },
@@ -33,9 +31,14 @@ const studyGuideSchema = {
             type: Type.ARRAY,
             items: { type: Type.STRING },
             description: "Practical, real-world examples illustrating the concepts.",
+        },
+        practiceProblems: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "A list of 2-3 practice problems or thought-provoking questions to help the student test their understanding. Do not provide answers."
         }
     },
-    required: ['keyConcepts', 'definitions', 'examples'],
+    required: ['summary', 'keyConcepts', 'definitions', 'examples', 'practiceProblems'],
 };
 
 const quizSchema = {
@@ -61,14 +64,22 @@ const quizSchema = {
     },
 };
 
-export const generateStudyGuide = async (subject: string, topic: string): Promise<StudyGuideContent> => {
-    const prompt = `Create a concise study guide for the topic "${topic}" within the TVET subject of "${subject}". The guide should be tailored for a student preparing for an exam. Focus on providing core information that is easy to digest and remember.`;
+const getAiClient = (apiKey: string) => {
+    if (!apiKey) {
+        throw new Error("API Key is missing.");
+    }
+    return new GoogleGenAI({ apiKey });
+};
+
+export const generateStudyGuide = async (subject: string, topic: string, apiKey: string): Promise<StudyGuideContent> => {
+    const ai = getAiClient(apiKey);
+    const prompt = `Create a comprehensive and detailed study guide for the topic "${topic}" within the subject of "${subject}". The guide should be tailored for a student preparing for an exam. It needs to be thorough, covering the topic in-depth, but still presented in a way that is easy to digest and remember. Include a detailed summary, key concepts, definitions, practical examples, and a few practice problems.`;
 
     const response = await ai.models.generateContent({
         model,
         contents: prompt,
         config: {
-            systemInstruction: "You are an expert educator specializing in Technical and Vocational Education and Training (TVET). Your goal is to create clear, concise, and easy-to-understand study materials.",
+            systemInstruction: "You are an expert educator specializing in creating clear, concise, and easy-to-understand study materials for Rwandan students.",
             responseMimeType: "application/json",
             responseSchema: studyGuideSchema,
         },
@@ -78,14 +89,15 @@ export const generateStudyGuide = async (subject: string, topic: string): Promis
     return JSON.parse(jsonText) as StudyGuideContent;
 };
 
-export const generateQuiz = async (subject: string, topic: string): Promise<QuizQuestion[]> => {
-    const prompt = `Generate a challenging 5-question multiple-choice quiz about "${topic}" from the TVET subject of "${subject}". Each question must have exactly four unique options, and one must be correct. Ensure the questions test practical knowledge relevant to the field.`;
+export const generateQuiz = async (subject: string, topic: string, apiKey: string): Promise<QuizQuestion[]> => {
+    const ai = getAiClient(apiKey);
+    const prompt = `Generate a challenging 5-question multiple-choice quiz about "${topic}" from the subject of "${subject}". Each question must have exactly four unique options, and one must be correct. Ensure the questions test practical knowledge relevant to the field.`;
     
     const response = await ai.models.generateContent({
         model,
         contents: prompt,
         config: {
-            systemInstruction: "You are an expert quiz creator for TVET subjects. You design challenging but fair multiple-choice questions.",
+            systemInstruction: "You are an expert quiz creator for Rwandan educational subjects. You design challenging but fair multiple-choice questions.",
             responseMimeType: "application/json",
             responseSchema: quizSchema,
         },
@@ -100,14 +112,15 @@ export const generateQuiz = async (subject: string, topic: string): Promise<Quiz
 };
 
 
-export const getExplanationForAnswer = async (question: string, incorrectAnswer: string, correctAnswer: string): Promise<string> => {
-    const prompt = `A student was asked the following question: "${question}". They incorrectly answered with "${incorrectAnswer}". The correct answer is "${correctAnswer}". Please provide a clear and concise explanation for why their answer is wrong and the correct answer is right. Keep the explanation simple and directly related to the question, suitable for a TVET student.`;
+export const getExplanationForAnswer = async (question: string, incorrectAnswer: string, correctAnswer: string, apiKey: string): Promise<string> => {
+    const ai = getAiClient(apiKey);
+    const prompt = `A student was asked the following question: "${question}". They incorrectly answered with "${incorrectAnswer}". The correct answer is "${correctAnswer}". Please provide a clear and concise explanation for why their answer is wrong and the correct answer is right. Keep the explanation simple and directly related to the question, suitable for a student in Rwanda.`;
 
     const response = await ai.models.generateContent({
         model,
         contents: prompt,
         config: {
-            systemInstruction: "You are a helpful and patient tutor for TVET students.",
+            systemInstruction: "You are a helpful and patient tutor for students.",
             // Disable thinking for faster, more direct responses on this simple task.
             thinkingConfig: { thinkingBudget: 0 } 
         }

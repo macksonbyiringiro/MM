@@ -1,6 +1,5 @@
 {
   "name": "Mackson Study Buddy",
   "description": "An AI-powered assistant from Mackson to help students in Technical and Vocational Education and Training (TVET) schools generate study guides and quizzes for various subjects and topics.",
-  "requestFramePermissions": [],
-  "prompt": ""
+  "requestFramePermissions": []
 }
