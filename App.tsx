@@ -7,6 +7,8 @@ import { Quiz } from './components/Quiz';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { generateStudyGuide, generateQuiz, getExplanationForAnswer } from './services/geminiService';
 import { QuizQuestion, StudyGuideContent, QuizState } from './types';
+import { useSettings } from './context/SettingsContext';
+import { SettingsModal } from './components/SettingsModal';
 
 const App: React.FC = () => {
     const [subject, setSubject] = useState<string>('');
@@ -23,6 +25,9 @@ const App: React.FC = () => {
     const [quizState, setQuizState] = useState<QuizState>(QuizState.NotStarted);
     const [explanation, setExplanation] = useState<string | null>(null);
     
+    const { apiKey } = useSettings();
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
     const resetState = () => {
         setStudyGuide(null);
         setQuiz(null);
@@ -40,37 +45,47 @@ const App: React.FC = () => {
             setError('Please enter a topic.');
             return;
         }
+        if (!apiKey) {
+            setError('Please set your Gemini API Key in the settings before generating content.');
+            setIsSettingsOpen(true);
+            return;
+        }
         resetState();
         setIsLoading(true);
         try {
-            const guide = await generateStudyGuide(subject, topic);
+            const guide = await generateStudyGuide(subject, topic, apiKey);
             setStudyGuide(guide);
         } catch (e) {
             console.error(e);
-            setError('Failed to generate study guide. Please check your connection and try again.');
+            setError('Failed to generate study guide. Please check your API key and try again.');
         } finally {
             setIsLoading(false);
         }
-    }, [subject, topic]);
+    }, [subject, topic, apiKey]);
 
     const handleGenerateQuiz = useCallback(async () => {
         if (!topic) {
             setError('Please enter a topic to generate a quiz.');
             return;
         }
+        if (!apiKey) {
+            setError('Please set your Gemini API Key in the settings before generating content.');
+            setIsSettingsOpen(true);
+            return;
+        }
         resetState();
         setIsLoading(true);
         try {
-            const questions = await generateQuiz(subject, topic);
+            const questions = await generateQuiz(subject, topic, apiKey);
             setQuiz(questions);
             setQuizState(QuizState.InProgress);
         } catch (e) {
             console.error(e);
-            setError('Failed to generate quiz. Please check your connection and try again.');
+            setError('Failed to generate quiz. Please check your API key and try again.');
         } finally {
             setIsLoading(false);
         }
-    }, [subject, topic]);
+    }, [subject, topic, apiKey]);
 
     const handleSubmitAnswer = useCallback(async () => {
         if (!selectedAnswer || !quiz) return;
@@ -82,9 +97,13 @@ const App: React.FC = () => {
         if (isCorrect) {
             setScore(prev => prev + 1);
         } else {
+            if (!apiKey) {
+                setExplanation("Could not load an explanation: API Key not set.");
+                return;
+            }
             setIsLoading(true);
             try {
-                const expl = await getExplanationForAnswer(currentQuestion.questionText, selectedAnswer, currentQuestion.correctAnswer);
+                const expl = await getExplanationForAnswer(currentQuestion.questionText, selectedAnswer, currentQuestion.correctAnswer, apiKey);
                 setExplanation(expl);
             } catch (e) {
                 console.error(e);
@@ -93,7 +112,7 @@ const App: React.FC = () => {
                 setIsLoading(false);
             }
         }
-    }, [selectedAnswer, quiz, currentQuestionIndex]);
+    }, [selectedAnswer, quiz, currentQuestionIndex, apiKey]);
 
     const handleNextQuestion = () => {
         if (quiz && currentQuestionIndex < quiz.length - 1) {
@@ -113,7 +132,9 @@ const App: React.FC = () => {
     
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 transition-colors duration-300">
-            <Header />
+            <Header onOpenSettings={() => setIsSettingsOpen(true)} />
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
             <main className="container mx-auto p-4 md:p-8">
                 <div className="max-w-4xl mx-auto">
                     <ControlPanel
@@ -124,6 +145,8 @@ const App: React.FC = () => {
                         onGenerateStudyGuide={handleGenerateStudyGuide}
                         onGenerateQuiz={handleGenerateQuiz}
                         isLoading={isLoading}
+                        isApiKeySet={!!apiKey}
+                        onOpenSettings={() => setIsSettingsOpen(true)}
                     />
 
                     {error && (

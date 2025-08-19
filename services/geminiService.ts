@@ -3,8 +3,6 @@ import type { StudyGuideContent, QuizQuestion } from '../types';
 
 const model = "gemini-2.5-flash";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const studyGuideSchema = {
     type: Type.OBJECT,
     properties: {
@@ -66,7 +64,15 @@ const quizSchema = {
     },
 };
 
-export const generateStudyGuide = async (subject: string, topic: string): Promise<StudyGuideContent> => {
+const getAiClient = (apiKey: string) => {
+    if (!apiKey) {
+        throw new Error("API Key is missing.");
+    }
+    return new GoogleGenAI({ apiKey });
+};
+
+export const generateStudyGuide = async (subject: string, topic: string, apiKey: string): Promise<StudyGuideContent> => {
+    const ai = getAiClient(apiKey);
     const prompt = `Create a comprehensive and detailed study guide for the topic "${topic}" within the subject of "${subject}". The guide should be tailored for a student preparing for an exam. It needs to be thorough, covering the topic in-depth, but still presented in a way that is easy to digest and remember. Include a detailed summary, key concepts, definitions, practical examples, and a few practice problems.`;
 
     const response = await ai.models.generateContent({
@@ -83,7 +89,8 @@ export const generateStudyGuide = async (subject: string, topic: string): Promis
     return JSON.parse(jsonText) as StudyGuideContent;
 };
 
-export const generateQuiz = async (subject: string, topic: string): Promise<QuizQuestion[]> => {
+export const generateQuiz = async (subject: string, topic: string, apiKey: string): Promise<QuizQuestion[]> => {
+    const ai = getAiClient(apiKey);
     const prompt = `Generate a challenging 5-question multiple-choice quiz about "${topic}" from the subject of "${subject}". Each question must have exactly four unique options, and one must be correct. Ensure the questions test practical knowledge relevant to the field.`;
     
     const response = await ai.models.generateContent({
@@ -105,7 +112,8 @@ export const generateQuiz = async (subject: string, topic: string): Promise<Quiz
 };
 
 
-export const getExplanationForAnswer = async (question: string, incorrectAnswer: string, correctAnswer: string): Promise<string> => {
+export const getExplanationForAnswer = async (question: string, incorrectAnswer: string, correctAnswer: string, apiKey: string): Promise<string> => {
+    const ai = getAiClient(apiKey);
     const prompt = `A student was asked the following question: "${question}". They incorrectly answered with "${incorrectAnswer}". The correct answer is "${correctAnswer}". Please provide a clear and concise explanation for why their answer is wrong and the correct answer is right. Keep the explanation simple and directly related to the question, suitable for a student in Rwanda.`;
 
     const response = await ai.models.generateContent({
